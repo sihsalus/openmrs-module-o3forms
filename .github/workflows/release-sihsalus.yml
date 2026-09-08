@@ -2,7 +2,7 @@ name: Build verified SIH Salus release assets
 
 on:
   push:
-    tags: ["2.3.0-sihsalus.*"]
+    tags: ["2.3.*-sihsalus.*"]
 
 permissions:
   contents: read
@@ -37,6 +37,8 @@ jobs:
           cache: maven
       - name: Build and test the complete reactor
         run: mvn --batch-mode --no-transfer-progress -Dformatter.skip=true -Dimpsort.skip=true clean verify
+      - name: Check packaged module against the deployed Core comparator
+        run: mvn --batch-mode --no-transfer-progress -f compatibility-tests/pom.xml clean verify
       - name: Validate the packaged module and record provenance
         env:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

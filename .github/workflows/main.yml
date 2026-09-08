@@ -34,6 +34,8 @@ jobs:
           cache: maven
       - name: Build and test the complete reactor
         run: mvn --batch-mode --no-transfer-progress -Dformatter.skip=true -Dimpsort.skip=true clean verify
+      - name: Check packaged module against the deployed Core comparator
+        run: mvn --batch-mode --no-transfer-progress -f compatibility-tests/pom.xml clean verify
       - name: Check for unexpected build changes
         run: git diff --exit-code
       - name: Upload test reports
@@ -47,6 +49,6 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: o3forms-candidate-${{ github.sha }}
-          path: omod/target/o3forms-2.3.0-sihsalus.1.omod
+          path: omod/target/o3forms-2.3.1-sihsalus.1.omod
           if-no-files-found: error
           retention-days: 7
