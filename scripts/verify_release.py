@@ -11,6 +11,9 @@ from pathlib import Path
 REPOSITORY = "sihsalus/openmrs-module-o3forms"
 MAINTENANCE_REF = "refs/remotes/origin/sihsalus/2.3.x"
 NAMESPACE = {"m": "http://maven.apache.org/POM/4.0.0"}
+# Qualifying the minimum 2.3.0 sorts BELOW that minimum in OpenMRS Core.
+# Require a positive patch increment; retain tag/head/artifact checks below.
+RELEASE_TAG_PATTERN = r"2\.3\.[1-9][0-9]*-sihsalus\.[1-9][0-9]*"
 
 
 def require(condition, message):
@@ -20,7 +23,7 @@ def require(condition, message):
 
 def verify_identity(repository, tag, head, tag_commit, maintenance_head, versions, dirty):
     require(repository == REPOSITORY, "Release repository is not the SIH Salus fork")
-    require(re.fullmatch(r"2\.3\.0-sihsalus\.[1-9][0-9]*", tag), "Unexpected release tag")
+    require(re.fullmatch(RELEASE_TAG_PATTERN, tag), "Unexpected release tag")
     require(re.fullmatch(r"[0-9a-f]{40}", head), "Invalid source commit")
     require(head == tag_commit, "Tag does not identify the checked-out source")
     require(head == maintenance_head, "Tag is not the current maintenance branch head")
@@ -70,7 +73,7 @@ def main():
     parser.add_argument("--artifact", type=Path)
     args = parser.parse_args()
     # Validate the tag before it can become part of a Git revision expression.
-    require(re.fullmatch(r"2\.3\.0-sihsalus\.[1-9][0-9]*", args.tag), "Unexpected release tag")
+    require(re.fullmatch(RELEASE_TAG_PATTERN, args.tag), "Unexpected release tag")
     verify_identity(
         args.repository, args.tag, git("rev-parse", "HEAD"),
         git("rev-parse", f"refs/tags/{args.tag}^{{commit}}"),

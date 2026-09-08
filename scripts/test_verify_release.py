@@ -7,7 +7,7 @@ from pathlib import Path
 
 from verify_release import REPOSITORY, maven_versions, verify_artifact, verify_identity
 
-VERSION = "2.3.0-sihsalus.1"
+VERSION = "2.3.1-sihsalus.1"
 SHA = "a" * 40
 
 
@@ -23,12 +23,23 @@ class ReleaseIdentityTest(unittest.TestCase):
     def test_accepts_exact_clean_maintenance_head(self):
         self.verify()
 
+    def test_accepts_future_positive_patch_and_qualifier_numbers(self):
+        for tag in ("2.3.1-sihsalus.2", "2.3.2-sihsalus.1", "2.3.10-sihsalus.12"):
+            with self.subTest(tag=tag):
+                self.verify(tag=tag, versions=[tag] * 4)
+
+    def test_rejects_reusing_the_incompatible_minimum_version_series(self):
+        for tag in ("2.3.0-sihsalus.1", "2.3.0-sihsalus.2"):
+            with self.subTest(tag=tag), self.assertRaisesRegex(ValueError, "tag"):
+                self.verify(tag=tag, versions=[tag] * 4)
+
     def test_rejects_upstream_repository(self):
         with self.assertRaisesRegex(ValueError, "repository"):
             self.verify(repository="openmrs/openmrs-module-o3forms")
 
     def test_rejects_unrelated_or_unsafe_tags(self):
-        for tag in ("3.0.0", "2.3.0", "2.3.0-SNAPSHOT", "2.3.0-sihsalus.0", "--help", VERSION + "\n"):
+        for tag in ("3.0.0", "2.3.0", "2.3.1", "2.3.1-SNAPSHOT", "2.3.1-sihsalus.0",
+                    "2.3.01-sihsalus.1", "2.3.1-sihsalus.01", "2.4.1-sihsalus.1", "--help", VERSION + "\n"):
             with self.subTest(tag=tag), self.assertRaisesRegex(ValueError, "tag"):
                 self.verify(tag=tag)
 

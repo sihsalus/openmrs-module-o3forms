@@ -14,7 +14,7 @@ This module requires OpenMRS 2.6.0 or higher and the webservices.rest module 2.4
 (`34733b3b909e8e35456c9afa7d643cc22c52bb91`). It deliberately does not include
 the dependency upgrades in upstream's newer branches.
 
-The candidate version is `2.3.0-sihsalus.1`. Translation selection skips null
+The candidate version is `2.3.1-sihsalus.1`. Translation selection skips null
 entries in the preferred locale set without modifying that set or its order.
 When no configured locale has a matching translation, no translation entries are
 added (the API returns an empty translations map). The patch does not invent a
@@ -24,6 +24,7 @@ Build and run the full test suite with Maven and JDK 21:
 
 ```sh
 mvn --batch-mode --no-transfer-progress -Dformatter.skip=true -Dimpsort.skip=true clean verify
+mvn --batch-mode --no-transfer-progress -f compatibility-tests/pom.xml clean verify
 ```
 
 The `java21-tests` profile automatically opens the JDK packages required by the
@@ -34,6 +35,21 @@ in-memory database; do not test this candidate against real patients or producti
 
 The build command skips the inherited automatic formatters to avoid rewriting
 unrelated legacy sources. It does not skip any tests, compilation or packaging.
+
+The standalone `compatibility-tests` project reads the actual packaged OMOD's
+`config.xml` and calls `ModuleUtil.compareVersion` from OpenMRS Core **2.8.8**,
+the deployed platform version. These dependencies have test scope and are not
+part of the runtime reactor or OMOD. Both PR CI and the release build must run
+this check after packaging, before retaining or attesting a candidate.
+
+The immutable `2.3.0-sihsalus.1` release is not compatible with Patient Documents'
+minimum O3 Forms version `2.3.0`: Core orders that qualified version **below**
+the minimum and prevents the dependent module from starting. Do not deploy or
+republish it. `2.3.1-sihsalus.1` retains the same null-locale fix and increments
+the numeric patch so it satisfies the existing `2.3.0` requirement. It does **not**
+claim to satisfy a future minimum of final `2.3.1`. Qualifier-ignoring helpers
+must not replace the comparator used by Core's module startup checks. Regression
+tests cover the rejected version as well as the packaged replacement.
 
 Java source, regression tests and OMOD compilation belong in this module
 repository. CI only builds/tests and retains short-lived review artifacts;
@@ -57,13 +73,16 @@ build is not clinical validation and does not authorize production use.
    must return `enabled: true`). If necessary, enabling it uses `PUT` on that
    same endpoint with repository Administration write permission. Do not change
    organization-wide settings or introduce an administrator token in CI.
-3. Create and push the exact version tag (for example `2.3.0-sihsalus.1`) at the
+3. Create and push the exact version tag (for example `2.3.1-sihsalus.1`) at the
    approved maintenance head. Never move or replace a release tag. The tag-only
    `release-sihsalus.yml` workflow rejects wrong repositories, stale heads, dirty
    sources, version mismatches and unexpected packaged module identities. It
    rebuilds and tests with JDK 21, then produces an OMOD, SHA256, provenance JSON
    and a signed GitHub artifact-attestation bundle. It cannot publish releases:
    its only write permissions are for OIDC and attestations.
+   New SIH Salus tags require a positive numeric patch increment (`2.3.1` or
+   higher within `2.3.x`); the incompatible `2.3.0-sihsalus.*` series is rejected.
+   The existing `2.3.0-sihsalus.1` tag and immutable assets must remain unchanged.
 4. Wait for that exact tag run to succeed and download its `o3forms-release-...`
    artifact to a fresh temporary directory with `gh run download`. Verify the
    checksum with `sha256sum --check o3forms-<version>.omod.sha256` (or
