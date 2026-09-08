@@ -8,6 +8,42 @@ This module provides REST APIs to provide backend services for O3-style forms
 
 This module requires OpenMRS 2.6.0 or higher and the webservices.rest module 2.40.0 or higher.
 
+## SIH Salus maintenance branch
+
+`sihsalus/2.3.x` starts at upstream tag `2.3.0`
+(`34733b3b909e8e35456c9afa7d643cc22c52bb91`). It deliberately does not include
+the dependency upgrades in upstream's newer branches.
+
+The candidate version is `2.3.0-sihsalus.1`. Translation selection skips null
+entries in the preferred locale set without modifying that set or its order.
+When no configured locale has a matching translation, no translation entries are
+added (the API returns an empty translations map). The patch does not invent a
+language fallback or repair OpenMRS's locale caches.
+
+Build and run the full test suite with Maven and JDK 21:
+
+```sh
+mvn --batch-mode --no-transfer-progress -Dformatter.skip=true -Dimpsort.skip=true clean verify
+```
+
+The `java21-tests` profile automatically opens the JDK packages required by the
+legacy test dependencies, only in the forked test JVM. Java 8 bytecode targets
+and runtime dependencies are unchanged. The profile preserves the JaCoCo agent
+and also supports `-Djacoco.skip=true`. Tests use synthetic fixtures in a local
+in-memory database; do not test this candidate against real patients or production.
+
+The build command skips the inherited automatic formatters to avoid rewriting
+unrelated legacy sources. It does not skip any tests, compilation or packaging.
+
+Java source, regression tests and OMOD compilation belong in this module
+repository. CI only builds/tests and retains short-lived review artifacts;
+it does not publish a release, deploy a module or restart a server. Maven
+publication is intentionally unconfigured in this branch, including removal of
+the upstream deployment destinations. Publishing requires a separate decision
+on the registry, the approved commit and the release process. After publication
+and validation, infrastructure may consume the immutable module version through
+its normal dependency configuration, without embedding Java source or patches.
+
 ## REST APIS
 
 ### O3 Form Schema
