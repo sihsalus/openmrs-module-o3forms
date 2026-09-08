@@ -18,15 +18,19 @@ jobs:
     if: github.repository == 'sihsalus/openmrs-module-o3forms'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Test release guards without publishing
+        run: python3 -m unittest discover -s scripts -p 'test_*.py' -v
       - name: Set up JDK 21
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: "21"
           cache: maven
       - name: Build and test the complete reactor
         run: mvn --batch-mode --no-transfer-progress -Dformatter.skip=true -Dimpsort.skip=true clean verify
@@ -37,7 +41,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: test-reports-${{ github.sha }}
-          path: '*/target/surefire-reports/TEST-*.xml'
+          path: "*/target/surefire-reports/TEST-*.xml"
           retention-days: 7
       - name: Upload candidate for review (not a release)
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
