@@ -58,10 +58,10 @@ import org.openmrs.api.FormService;
 import org.openmrs.api.context.Context;
 import org.openmrs.api.db.ClobDatatypeStorage;
 import org.openmrs.api.impl.BaseOpenmrsService;
-import org.openmrs.module.o3forms.api.exceptions.FormResourcesNotFoundException;
-import org.openmrs.module.o3forms.api.exceptions.FormSchemaNotFoundException;
 import org.openmrs.module.o3forms.api.O3FormsService;
 import org.openmrs.module.o3forms.api.exceptions.FormNotFoundException;
+import org.openmrs.module.o3forms.api.exceptions.FormResourcesNotFoundException;
+import org.openmrs.module.o3forms.api.exceptions.FormSchemaNotFoundException;
 import org.openmrs.module.o3forms.api.exceptions.FormSchemaReadException;
 import org.openmrs.module.webservices.rest.SimpleObject;
 import org.openmrs.module.webservices.rest.web.ConversionUtil;
@@ -515,6 +515,10 @@ public class O3FormsServiceImpl extends BaseOpenmrsService implements O3FormsSer
 	private Optional<Map<String, Object>> getTranslationsByPreferredLocales(LinkedHashSet<Locale> locales,
 	        List<FormResource> formResources) {
 		for (Locale locale : locales) {
+			// Skip absent locales without changing the caller's preference order or shared locale state.
+			if (locale == null) {
+				continue;
+			}
 			String needle = "_translations_" + locale.toLanguageTag();
 			for (FormResource resource : formResources) {
 				if (resource.getName() != null && resource.getName().endsWith(needle)) {

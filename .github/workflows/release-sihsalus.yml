@@ -1,0 +1,110 @@
+name: Build verified SIH Salus release assets
+
+on:
+  push:
+    tags: ["2.3.0-sihsalus.*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: o3forms-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.repository == 'sihsalus/openmrs-module-o3forms'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Test release guards and validate the source tag
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s scripts -p 'test_*.py' -v
+          python3 scripts/verify_release.py --repository "$GITHUB_REPOSITORY" --tag "$RELEASE_TAG"
+      - name: Set up JDK 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Build and test the complete reactor
+        run: mvn --batch-mode --no-transfer-progress -Dformatter.skip=true -Dimpsort.skip=true clean verify
+      - name: Validate the packaged module and record provenance
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          omod_file="o3forms-${RELEASE_TAG}.omod"
+          python3 scripts/verify_release.py --repository "$GITHUB_REPOSITORY" --tag "$RELEASE_TAG" --artifact "omod/target/$omod_file"
+          cd omod/target
+          sha256sum "$omod_file" > "$omod_file.sha256"
+          jq -n --arg repository "$GITHUB_REPOSITORY" --arg tag "$RELEASE_TAG" \
+            --arg commit "$GITHUB_SHA" --arg run "$RUN_URL" --arg artifact "$omod_file" \
+            --arg sha256 "$(sha256sum "$omod_file" | cut -d ' ' -f 1)" \
+            '{repository: $repository, tag: $tag, commit: $commit, build_run: $run, artifact: $artifact, sha256: $sha256}' \
+            > "$omod_file.provenance.json"
+      - name: Pass verified assets to the attestation job
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: o3forms-unsigned-${{ github.ref_name }}-${{ github.sha }}
+          path: |
+            omod/target/o3forms-${{ env.RELEASE_TAG }}.omod
+            omod/target/o3forms-${{ env.RELEASE_TAG }}.omod.sha256
+            omod/target/o3forms-${{ env.RELEASE_TAG }}.omod.provenance.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-test-reports-${{ github.sha }}
+          path: "*/target/surefire-reports/TEST-*.xml"
+          retention-days: 14
+
+  attest:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - name: Download only the tested assets from this run
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: o3forms-unsigned-${{ github.ref_name }}-${{ github.sha }}
+          path: release-assets
+      - name: Verify the binary checksum
+        working-directory: release-assets
+        run: sha256sum --check "o3forms-${RELEASE_TAG}.omod.sha256"
+      - name: Attest the release binary
+        id: attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: release-assets/o3forms-${{ env.RELEASE_TAG }}.omod
+      - name: Include the signed provenance bundle
+        env:
+          BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
+        run: cp "$BUNDLE_PATH" "release-assets/o3forms-${RELEASE_TAG}.omod.sigstore.json"
+      - name: Upload verified assets for authorized immutable publication
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: o3forms-release-${{ github.ref_name }}-${{ github.sha }}
+          path: |
+            release-assets/o3forms-${{ env.RELEASE_TAG }}.omod
+            release-assets/o3forms-${{ env.RELEASE_TAG }}.omod.sha256
+            release-assets/o3forms-${{ env.RELEASE_TAG }}.omod.provenance.json
+            release-assets/o3forms-${{ env.RELEASE_TAG }}.omod.sigstore.json
+          if-no-files-found: error
+          retention-days: 14
